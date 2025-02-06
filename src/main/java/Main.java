@@ -1,45 +1,55 @@
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class Main {
     public static void main(String[] args) {
-        CountDownLatch countDownLatch = new CountDownLatch(10);
-        // interface, под который нужно подставить определенную реализацию
-//        ExecutorService executorService = Executors.newFixedThreadPool(5);
 
-        // работает точно также, как newFixedThreadPool, но его пул состоит из одного потока, когда первая задача выполнена,
-        // то берется следующая задача из очереди и т.д.
-//        ExecutorService executorService = Executors.newSingleThreadExecutor();
 
-        // создаёт новые потоки по мере необходимости, когда ему подаётся задача, он смотрит, есть ли свободные потоки,
-        // если есть, то отдаёт задачу ему, если нет, то создаёт новый поток.
-        // Причем после завершения задачи, этот пул - не уменьшается.
-        // Может привести к утечке ресурсов
-        ExecutorService executorService = Executors.newCachedThreadPool();
-
-        for (int i = 0; i < 10; i++) {
-            final int counter = i;
-            executorService.execute(new Runnable() {
-                @Override
-                public void run() {
-                    System.out.println("Start - " + counter);
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
+        List<Integer> numbers = Collections.synchronizedList(new ArrayList<>()); // Передача синхронизированной коллекции
+        
+        CountDownLatch countDownLatch = new CountDownLatch(2);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (int i = 0; i < 100; i++) {
+                        Thread.sleep(100);
+                        numbers.add(i);
                     }
-                    System.out.println("Finish - " + counter);
                     countDownLatch.countDown();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
-            });
-        }
-        executorService.shutdown(); // с этого момента в него уже нельзя передавать новые задачи
+            }
+        }).start();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (int i = 0; i < 100; i++) {
+                        Thread.sleep(100);
+                        numbers.add(i);
+                    }
+                    countDownLatch.countDown();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }).start();
         try {
-            countDownLatch.await(); // wait for all threads to finish
+            countDownLatch.await();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("All threads are terminated");
+        for (int number : numbers) {
+            System.out.println(number);
+        }
+        System.out.println("numbers.size(): " + numbers.size());
     }
 }
+
